@@ -367,22 +367,24 @@ class Lot010Tests(unittest.TestCase):
         self.assertFalse(lot_allowed(0.01, 0.01, 50, 0.01, 0, 0, required=0.10))
         self.assertFalse(lot_allowed(0.10, 0.20, 50, 0.01, 0, 0, required=0.10))
         self.assertFalse(lot_allowed(0.10, 0.01, 50, 0.03, 0, 0, required=0.10))
-        self.assertFalse(environment_allowed("lot010", False, "demo", "hedge", "USD"))
-        self.assertFalse(environment_allowed("lot010", False, "real", "hedge", "USD"))
-        self.assertTrue(environment_allowed("lot010", True, "demo", "hedge", "USD"))
-        self.assertFalse(environment_allowed("lot010", True, "demo", "netting", "USD"))
+        self.assertFalse(environment_allowed("r50lot010", False, "demo", "hedge", "USD"))
+        self.assertFalse(environment_allowed("r50lot010", False, "real", "hedge", "USD"))
+        self.assertTrue(environment_allowed("r50lot010", True, "demo", "hedge", "USD"))
+        self.assertFalse(environment_allowed("r50lot010", True, "demo", "netting", "USD"))
 
-    def test_fixed_fee_is_not_multiplied_by_ten(self):
+    def test_fixed_fee_is_not_multiplied_and_cap_stays_50(self):
         # Price P/L scales with lot. The configured commission is added once.
-        # 22.88 from an old 0.01 log must not be treated as an exact 228.80 at 0.10.
+        # An old 0.01 figure such as 22.88 must not be multiplied by 10 and treated as exact.
         small = risk_total(1, 100.0, 97.0, 0.01, 0.01, 0, 1.0, stub_profit)
         large = risk_total(1, 100.0, 97.0, 0.10, 0.01, 0, 1.0, stub_profit)
         self.assertAlmostEqual(small, 4.0)
         self.assertAlmostEqual(large, 31.0)
         self.assertNotAlmostEqual(large, small * 10)
-        self.assertFalse(risk_allows(large, 30.0))
-        self.assertTrue(risk_allows(30.0, 30.0))
-        self.assertFalse(risk_allows(300.0, 30.0))
+        self.assertTrue(risk_allows(50.0, 50.0))
+        self.assertFalse(risk_allows(50.01, 50.0))
+        self.assertTrue(risk_allows(large, 50.0))
+        self.assertFalse(risk_allows(300.0, 50.0))
+        self.assertFalse(risk_allows(50.0, 30.0))
 
     def test_three_same_day_losses_pause_and_do_not_survive_the_day(self):
         streak, halt = apply_day_streak(0, 0, -1)
@@ -407,16 +409,16 @@ class Lot010Tests(unittest.TestCase):
         self.assertEqual((streak, halt, daily_halt), (3, 1, False))
 
     def test_lot010_state_is_not_adopted_by_older_variants(self):
-        self.assertNotEqual(state_filename("lot010", "7"), state_filename("demo10", "7"))
-        self.assertNotEqual(state_filename("lot010", "7"), state_filename("tester30", "7"))
-        comment = make_comment(26011410, 1000, "L010")
+        self.assertNotEqual(state_filename("r50lot010", "7"), state_filename("demo10", "7"))
+        self.assertNotEqual(state_filename("r50lot010", "7"), state_filename("tester30", "7"))
+        comment = make_comment(26011450, 1000, "R050")
         self.assertLessEqual(len(comment), 31)
-        item = Item("8", 26011410, "XAUUSD", comment)
-        decision, _fresh = classify_startup([item], "8", "", 26011410, "XAUUSD", False, tag="L010")
+        item = Item("8", 26011450, "XAUUSD", comment)
+        decision, _fresh = classify_startup([item], "8", "", 26011450, "XAUUSD", False, tag="R050")
         self.assertEqual(decision, "adopt")
-        decision, _fresh = classify_startup([item], "8", "", 26011410, "XAUUSD", False, tag="XT30")
+        decision, _fresh = classify_startup([item], "8", "", 26011450, "XAUUSD", False, tag="XT30")
         self.assertEqual(decision, "refuse")
-        decision, _fresh = classify_startup([item], "8", "", 26011410, "XAUUSD", False, tag="XD1")
+        decision, _fresh = classify_startup([item], "8", "", 26011450, "XAUUSD", False, tag="XD1")
         self.assertEqual(decision, "refuse")
 
 

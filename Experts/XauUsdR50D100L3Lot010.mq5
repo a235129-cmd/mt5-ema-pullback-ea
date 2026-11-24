@@ -1,16 +1,16 @@
 //+------------------------------------------------------------------+
-//| XauUsdT30D100L3Lot010.mq5                                        |
+//| XauUsdR50D100L3Lot010.mq5                                        |
 //| MIT License. Tester-only 0.10 lot comparison. Does not change   |
-//| the 0.01 demo EA or T30D100L3Lot010. Trade cap stays 30 USD.       |
+//| the 0.01 demo EA or R50D100L3Lot010. Trade cap is 50 USD.       |
 //| Daily pause is 100 USD. Same-day streak pause is 3, cleared     |
 //| next server day. Not compiled or backtested in this run.        |
 //+------------------------------------------------------------------+
 #property copyright "MIT License"
 #property version   "1.00"
-#property description "Tester-only 0.10 lot. Trade cap 30 USD. Daily pause 100. Streak 3. Charts refused."
+#property description "Tester-only 0.10 lot. Trade cap 50 USD. Daily pause 100. Streak 3. Charts refused."
 
 input group "=== 可调环境参数（假设，不是收益承诺） ==="
-input long   InpMagic            = 26011410; // 魔法号，必须是 1 到 99999999
+input long   InpMagic            = 26011450; // 魔法号，必须是 1 到 99999999
 input double InpMaxSpreadPrice   = 0.50;     // 最大点差，按价格而不是点数
 input double InpCommissionBuffer = 1.0;      // 往返手续费缓冲（美元，占位）
 input int    InpSlippagePoints   = 30;       // 滑点点数：下单偏差和风险缓冲共用
@@ -19,7 +19,7 @@ input int    InpExpiryBars       = 24;       // 形态有效的后续已收盘 H
 #define LOT            0.10
 #define SL_MULT        1.5
 #define TP_R           2.0
-#define RISK_CAP       30.0
+#define RISK_CAP       50.0
 #define DAILY_CAP      100.0
 #define STREAK_CAP     3
 #define MAX_CATCHUP    48
@@ -100,7 +100,7 @@ bool ForeignPresent();
 void LogBoth(const string zh, const string en, const string detail)
   {
    string line = TimeToString(TimeCurrent(), TIME_DATE | TIME_SECONDS);
-   line += " | variant=T30D100L3Lot010 riskCap=30 dailyCap=100 streakCap=3 lot=0.10 | " + zh + " | " + en;
+   line += " | variant=R50D100L3Lot010 riskCap=50 dailyCap=100 streakCap=3 lot=0.10 | " + zh + " | " + en;
    if(StringLen(detail) > 0)
       line += " | " + detail;
    Print(line);
@@ -182,12 +182,12 @@ uint Fnv32(const string text)
 //+------------------------------------------------------------------+
 string StateFileName()
   {
-   string seed = "T30D100L3Lot010|"
+   string seed = "R50D100L3Lot010|"
                  + IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN)) + "|"
                  + AccountInfoString(ACCOUNT_SERVER) + "|"
                  + _Symbol + "|"
                  + IntegerToString(InpMagic);
-   return "XauLot010_" + StringFormat("%u", Fnv32(seed)) + ".txt";
+   return "XauR50Lot010_" + StringFormat("%u", Fnv32(seed)) + ".txt";
   }
 
 //+------------------------------------------------------------------+
@@ -217,21 +217,21 @@ bool AccountAllowed()
   {
    if(!MQLInfoInteger(MQL_TESTER))
      {
-      LogBoth("拒绝启动：T30D100L3Lot010 只能在策略测试器运行。真实图表和模拟图表都不允许，没有开关可以放开",
-              "refuse start: T30D100L3Lot010 runs only in the strategy tester. Real and demo charts are blocked, no override",
-              "variant=T30D100L3Lot010 riskCap=30 dailyCap=100 streakCap=3 lot=0.10");
+      LogBoth("拒绝启动：R50D100L3Lot010 只能在策略测试器运行。真实图表和模拟图表都不允许，没有开关可以放开",
+              "refuse start: R50D100L3Lot010 runs only in the strategy tester. Real and demo charts are blocked, no override",
+              "variant=R50D100L3Lot010 riskCap=50 dailyCap=100 streakCap=3 lot=0.10");
       return false;
      }
    long margin = AccountInfoInteger(ACCOUNT_MARGIN_MODE);
    if(margin != ACCOUNT_MARGIN_MODE_RETAIL_HEDGING)
      {
-      LogBoth("拒绝启动：账户不是对冲模式", "refuse start: account is not hedging", "variant=T30D100L3Lot010");
+      LogBoth("拒绝启动：账户不是对冲模式", "refuse start: account is not hedging", "variant=R50D100L3Lot010");
       return false;
      }
    string currency = AccountInfoString(ACCOUNT_CURRENCY);
    if(currency != "USD")
      {
-      LogBoth("拒绝启动：账户货币不是美元", "refuse start: account currency is not USD", "variant=T30D100L3Lot010");
+      LogBoth("拒绝启动：账户货币不是美元", "refuse start: account currency is not USD", "variant=R50D100L3Lot010");
       return false;
      }
    return true;
@@ -240,13 +240,13 @@ bool AccountAllowed()
 //+------------------------------------------------------------------+
 string Prefix()
   {
-   return "L010:" + IntegerToString(g_st.magic) + ":";
+   return "R050:" + IntegerToString(g_st.magic) + ":";
   }
 
 //+------------------------------------------------------------------+
 string MakeComment(const long magic, const datetime setupBar)
   {
-   return "L010:" + IntegerToString(magic) + ":" + IntegerToString((long)setupBar);
+   return "R050:" + IntegerToString(magic) + ":" + IntegerToString((long)setupBar);
   }
 
 //+------------------------------------------------------------------+
@@ -1000,7 +1000,7 @@ bool CloseManaged(const ulong ticket)
    long magic = PositionGetInteger(POSITION_MAGIC);
    string symbol = PositionGetString(POSITION_SYMBOL);
    string comment = PositionGetString(POSITION_COMMENT);
-   bool prefixOk = (StringFind(comment, Prefix()) == 0 || comment == "L010flat");
+   bool prefixOk = (StringFind(comment, Prefix()) == 0 || comment == "R050flat");
    bool allowed = (id == g_st.needFlattenId && magic == g_st.magic && symbol == _Symbol && prefixOk);
    if(!allowed)
      {
@@ -1026,7 +1026,7 @@ bool CloseManaged(const ulong ticket)
    request.price = (type == POSITION_TYPE_BUY ? tk.bid : tk.ask);
    request.deviation = (ulong)MathMax(InpSlippagePoints, 0);
    request.magic = (ulong)g_st.magic;
-   request.comment = "L010flat";
+   request.comment = "R050flat";
    request.type_filling = FillingMode();
    request.type_time = ORDER_TIME_GTC;
    bool sent = SendTrade(request, result);
@@ -1129,7 +1129,7 @@ bool ProtectionOk(const ulong ticket, string &why)
    double total = 0;
    if(!RiskTotal(g_st.entryDir, openPrice, sl, total) || total > RISK_CAP + 1e-6)
      {
-      why = "按实际成交价重算后的风险超过 30 美元";
+      why = "按实际成交价重算后的风险超过 50 美元";
       return false;
      }
    g_risk = total;
@@ -1821,7 +1821,7 @@ bool PrepareOrder(string &why)
      }
    if(total > RISK_CAP + 1e-9)
      {
-      why = "计划风险含缓冲超过 30 美元，跳过";
+      why = "计划风险含缓冲超过 50 美元，跳过";
       g_risk = total;
       g_sl = sl;
       g_tp = tp;
@@ -2091,9 +2091,9 @@ int OnInit()
    g_atr = INVALID_HANDLE;
    if(!MQLInfoInteger(MQL_TESTER))
      {
-      LogBoth("拒绝启动：T30D100L3Lot010 只能在策略测试器运行。真实图表和模拟图表都不允许，没有开关可以放开",
-              "refuse start: T30D100L3Lot010 runs only in the strategy tester. Real and demo charts are blocked, no override",
-              "variant=T30D100L3Lot010 riskCap=30 dailyCap=100 streakCap=3 lot=0.10");
+      LogBoth("拒绝启动：R50D100L3Lot010 只能在策略测试器运行。真实图表和模拟图表都不允许，没有开关可以放开",
+              "refuse start: R50D100L3Lot010 runs only in the strategy tester. Real and demo charts are blocked, no override",
+              "variant=R50D100L3Lot010 riskCap=50 dailyCap=100 streakCap=3 lot=0.10");
       return INIT_FAILED;
      }
    if(MQLInfoInteger(MQL_FRAME_MODE))
@@ -2186,9 +2186,9 @@ int OnInit()
       return INIT_FAILED;
      }
    g_ready = true;
-   LogBoth("初始化完成。variant=T30D100L3Lot010。固定 0.10 手，H1 EMA20/50，止损 1.5 ATR，止盈 2 倍止损距离，没有移动止损。单笔计划风险上限仍是 30 美元。当日不利盈亏 100 美元只暂停新仓。当天连亏 3 笔暂停，下一服务器日解除。这不是收益承诺",
-           "init ok. variant=T30D100L3Lot010. Fixed 0.10 lot, H1 EMA20/50, SL 1.5 ATR, TP 2R, no trailing. Trade cap stays 30 USD. Daily adverse 100 USD only pauses new entries. Three same-day losses pause until the next server day. No performance claim",
-           StringFormat("variant=T30D100L3Lot010 riskCap=30 dailyCap=100 streakCap=3 lot=0.10 state=%s tester=%d spreadCap=%s commission=%s slippagePts=%d expiry=%d",
+   LogBoth("初始化完成。variant=R50D100L3Lot010。固定 0.10 手，H1 EMA20/50，止损 1.5 ATR，止盈 2 倍止损距离，没有移动止损。单笔计划风险上限是 50 美元。当日不利盈亏 100 美元只暂停新仓。当天连亏 3 笔暂停，下一服务器日解除。这不是收益承诺",
+           "init ok. variant=R50D100L3Lot010. Fixed 0.10 lot, H1 EMA20/50, SL 1.5 ATR, TP 2R, no trailing. Trade cap is 50 USD. Daily adverse 100 USD only pauses new entries. Three same-day losses pause until the next server day. No performance claim",
+           StringFormat("variant=R50D100L3Lot010 riskCap=50 dailyCap=100 streakCap=3 lot=0.10 state=%s tester=%d spreadCap=%s commission=%s slippagePts=%d expiry=%d",
                         g_file, IsTester() ? 1 : 0,
                         DoubleToString(InpMaxSpreadPrice, 2),
                         DoubleToString(InpCommissionBuffer, 2),
