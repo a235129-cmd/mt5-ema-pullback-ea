@@ -6,7 +6,9 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 EA = ROOT / "Experts" / "XauUsdDemoSafeEA.mq5"
+TESTER = ROOT / "Experts" / "XauUsdTesterOnly30.mq5"
 ORIGINAL = {
+    "Experts/XauUsdDemoSafeEA.mq5": "fa8cea4edd199d7f1c84d7a07626ee6908ece944d26cf7f1e74e0e9a5ada7783",
     "Experts/EmaPullbackEA.mq5": "fc6daf208a62019b61cb1d94cd16131b4402c7a83fa38a3d9328cd61e0b5a906",
     "Include/EmaPullback/Risk.mqh": "fc96a36d978fde2fba1a6baf449ddddd914d25e2e2cf63f2ea5b0eb140e0768d",
     "Include/EmaPullback/Signal.mqh": "f73b3f25ccc711d04a254adbf8a45142558a80af54d2728a0cdeba01fef58ef6",
@@ -100,6 +102,35 @@ class SourceTests(unittest.TestCase):
         old = (ROOT / "Experts" / "EmaPullbackEA.mq5").read_text(encoding="utf-8")
         self.assertIn("InpFastEMA       = 21", old)
         self.assertNotIn("XauUsdDemoSafe", old)
+
+    def test_tester30_is_isolated_and_does_not_move_other_caps(self):
+        demo = EA.read_text(encoding="utf-8")
+        tester = TESTER.read_text(encoding="utf-8")
+        self.assertNotEqual(demo, tester)
+        self.assertIn("#define RISK_CAP       10.0", demo)
+        self.assertIn("#define DAILY_CAP      10.0", demo)
+        self.assertNotIn("TesterOnly30", demo)
+        self.assertNotIn("XauTest30_", demo)
+        self.assertIn("#define RISK_CAP       30.0", tester)
+        self.assertIn("#define DAILY_CAP      10.0", tester)
+        self.assertIn("variant=TesterOnly30 riskCap=30 dailyCap=10", tester)
+        self.assertIn("XauTest30_", tester)
+        self.assertIn("TesterOnly30|", tester)
+        self.assertIn("XT30:", tester)
+        self.assertNotIn("XD1:", tester)
+        self.assertNotIn("XauDemoSafe_", tester)
+        self.assertIn("if(!MQLInfoInteger(MQL_TESTER))", tester)
+        self.assertIn("计划风险含缓冲超过 30 美元", tester)
+        self.assertIn("当日不利盈亏达到 10 美元", tester)
+        self.assertNotIn("当日不利盈亏达到 30 美元", tester)
+        self.assertIn("STREAK_CAP     2", tester)
+        self.assertIn("0.01", tester)
+        self.assertNotIn("InpAllowChart", tester)
+        self.assertNotIn("WebRequest", tester)
+        self.assertNotIn("#include", tester)
+        code = strip_mql(tester)
+        self.assertEqual(code.count("{"), code.count("}"))
+        self.assertEqual(code.count("("), code.count(")"))
 
 
 if __name__ == "__main__":

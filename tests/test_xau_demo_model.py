@@ -16,6 +16,7 @@ from xau_demo_model import (  # noqa: E402
     catchup_too_wide,
     classify_startup,
     daily_loss_hit,
+    environment_allowed,
     is_gold_symbol,
     lot_allowed,
     make_comment,
@@ -25,6 +26,7 @@ from xau_demo_model import (  # noqa: E402
     risk_total,
     roll_server_day,
     spread_ok,
+    state_filename,
 )
 
 
@@ -310,6 +312,48 @@ class SignalTests(unittest.TestCase):
         self.assertTrue(entry_window_fresh(1300, 1300))
         self.assertTrue(entry_window_fresh(1420, 1300))
         self.assertFalse(entry_window_fresh(1421, 1300))
+
+
+class VariantGateTests(unittest.TestCase):
+    def test_trade_cap_boundaries_do_not_move_the_daily_halt(self):
+        self.assertTrue(risk_allows(10.0, 10.0))
+        self.assertFalse(risk_allows(10.01, 10.0))
+        self.assertFalse(risk_allows(14.88, 10.0))
+        self.assertTrue(risk_allows(14.88, 30.0))
+        self.assertTrue(risk_allows(30.0, 30.0))
+        self.assertFalse(risk_allows(30.01, 30.0))
+        self.assertFalse(risk_allows(47.75, 30.0))
+        self.assertTrue(daily_loss_hit(-10.0, 0.0))
+        self.assertFalse(daily_loss_hit(-9.99, 0.0))
+        self.assertTrue(daily_loss_hit(-30.0, 0.0))
+        self.assertGreater(30.0, 10.0)
+
+    def test_tester30_refuses_every_chart_and_keeps_hedge_usd(self):
+        for mode in ("demo", "real", "contest"):
+            self.assertFalse(environment_allowed("tester30", False, mode, "hedge", "USD"))
+        self.assertTrue(environment_allowed("tester30", True, "demo", "hedge", "USD"))
+        self.assertTrue(environment_allowed("tester30", True, "real", "hedge", "USD"))
+        self.assertFalse(environment_allowed("tester30", True, "demo", "netting", "USD"))
+        self.assertFalse(environment_allowed("tester30", True, "demo", "hedge", "EUR"))
+        self.assertTrue(environment_allowed("demo10", False, "demo", "hedge", "USD"))
+        self.assertFalse(environment_allowed("demo10", False, "real", "hedge", "USD"))
+
+    def test_state_files_and_comments_stay_apart(self):
+        self.assertNotEqual(state_filename("demo10", "99"), state_filename("tester30", "99"))
+        self.assertTrue(state_filename("demo10", "99").startswith("XauDemoSafe_"))
+        self.assertTrue(state_filename("tester30", "99").startswith("XauTest30_"))
+        demo = make_comment(26011421, 1000, "XD1")
+        other = make_comment(26011430, 1000, "XT30")
+        self.assertLessEqual(len(other), 31)
+        self.assertFalse(other.startswith("XD1:"))
+        self.assertFalse(demo.startswith("XT30:"))
+        item = Item("10", 26011430, "XAUUSD", other)
+        decision, _fresh = classify_startup([item], "10", "", 26011430, "XAUUSD", False, tag="XT30")
+        self.assertEqual(decision, "adopt")
+        decision, _fresh = classify_startup([item], "10", "", 26011430, "XAUUSD", False, tag="XD1")
+        self.assertEqual(decision, "refuse")
+        self.assertFalse(may_flatten(item, {"10"}, 26011430, "XAUUSD", tag="XD1"))
+        self.assertTrue(may_flatten(item, {"10"}, 26011430, "XAUUSD", tag="XT30"))
 
 
 if __name__ == "__main__":

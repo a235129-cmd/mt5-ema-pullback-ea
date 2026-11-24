@@ -30,19 +30,23 @@ def is_gold_symbol(name: str) -> bool:
     return all(ch in allowed for ch in rest)
 
 
-def make_comment(magic: int, setup_bar: int) -> str:
+def make_comment(magic: int, setup_bar: int, tag: str = "XD1") -> str:
     if magic < 1 or magic > 99999999:
         raise ValueError("magic out of range")
     if setup_bar < 0:
         raise ValueError("setup bar")
-    text = f"XD1:{magic}:{setup_bar}"
+    if tag not in ("XD1", "XT30"):
+        raise ValueError("tag")
+    text = f"{tag}:{magic}:{setup_bar}"
     if len(text) > COMMENT_MAX:
         raise ValueError("comment longer than 31")
     return text
 
 
-def comment_prefix(magic: int) -> str:
-    return f"XD1:{magic}:"
+def comment_prefix(magic: int, tag: str = "XD1") -> str:
+    if tag not in ("XD1", "XT30"):
+        raise ValueError("tag")
+    return f"{tag}:{magic}:"
 
 
 def account_allowed(is_tester: bool, trade_mode: str, margin_mode: str, currency: str) -> bool:
@@ -148,10 +152,29 @@ def risk_total(direction, entry, sl, volume, point, slippage_points, commission,
     return total
 
 
-def risk_allows(total) -> bool:
+def risk_allows(total, cap=RISK_CAP) -> bool:
     if total is None:
         return False
-    return total <= RISK_CAP + 1e-9
+    return total <= cap + 1e-9
+
+
+def environment_allowed(variant, is_tester, trade_mode, margin_mode, currency) -> bool:
+    """demo10 may run on a USD hedging demo chart. tester30 may run only in the tester."""
+    if margin_mode != "hedge" or currency != "USD":
+        return False
+    if variant == "demo10":
+        return True if is_tester else trade_mode == "demo"
+    if variant == "tester30":
+        return bool(is_tester)
+    raise ValueError(variant)
+
+
+def state_filename(variant, digest) -> str:
+    if variant == "demo10":
+        return f"XauDemoSafe_{digest}.txt"
+    if variant == "tester30":
+        return f"XauTest30_{digest}.txt"
+    raise ValueError(variant)
 
 
 def lot_allowed(lot, vmin, vmax, step, volume_limit, open_volume) -> bool:
@@ -214,8 +237,8 @@ class Item:
     preexisting: bool = False
 
 
-def classify_startup(items, own_id, pending_comment, magic, symbol, inflight):
-    prefix = comment_prefix(magic)
+def classify_startup(items, own_id, pending_comment, magic, symbol, inflight, tag="XD1"):
+    prefix = comment_prefix(magic, tag)
     verified = []
     fresh = []
     foreign = []
@@ -250,14 +273,14 @@ def classify_startup(items, own_id, pending_comment, magic, symbol, inflight):
     return "empty", fresh
 
 
-def may_flatten(item: Item, fresh_ids, magic, symbol) -> bool:
+def may_flatten(item: Item, fresh_ids, magic, symbol, tag="XD1") -> bool:
     if item.preexisting:
         return False
     if item.id not in fresh_ids:
         return False
     if item.magic != magic or item.symbol != symbol:
         return False
-    return item.comment.startswith(comment_prefix(magic))
+    return item.comment.startswith(comment_prefix(magic, tag))
 
 
 @dataclass
