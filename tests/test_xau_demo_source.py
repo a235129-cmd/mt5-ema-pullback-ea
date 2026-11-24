@@ -9,6 +9,7 @@ EA = ROOT / "Experts" / "XauUsdDemoSafeEA.mq5"
 TESTER = ROOT / "Experts" / "XauUsdTesterOnly30.mq5"
 ORIGINAL = {
     "Experts/XauUsdDemoSafeEA.mq5": "fa8cea4edd199d7f1c84d7a07626ee6908ece944d26cf7f1e74e0e9a5ada7783",
+    "Experts/XauUsdTesterOnly30.mq5": "0288a9e7bbf67ce406f8112878f442738a9d8d3333a243a802e3963e1859790c",
     "Experts/EmaPullbackEA.mq5": "fc6daf208a62019b61cb1d94cd16131b4402c7a83fa38a3d9328cd61e0b5a906",
     "Include/EmaPullback/Risk.mqh": "fc96a36d978fde2fba1a6baf449ddddd914d25e2e2cf63f2ea5b0eb140e0768d",
     "Include/EmaPullback/Signal.mqh": "f73b3f25ccc711d04a254adbf8a45142558a80af54d2728a0cdeba01fef58ef6",
@@ -129,6 +130,32 @@ class SourceTests(unittest.TestCase):
         self.assertNotIn("WebRequest", tester)
         self.assertNotIn("#include", tester)
         code = strip_mql(tester)
+        self.assertEqual(code.count("{"), code.count("}"))
+        self.assertEqual(code.count("("), code.count(")"))
+
+    def test_lot010_changes_only_lot_daily_pause_and_same_day_streak(self):
+        path = ROOT / "Experts" / "XauUsdT30D100L3Lot010.mq5"
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("#define LOT            0.10", text)
+        self.assertIn("#define RISK_CAP       30.0", text)
+        self.assertIn("#define DAILY_CAP      100.0", text)
+        self.assertIn("#define STREAK_CAP     3", text)
+        self.assertIn("variant=T30D100L3Lot010 riskCap=30 dailyCap=100 streakCap=3 lot=0.10", text)
+        self.assertIn("XauLot010_", text)
+        self.assertIn("L010:", text)
+        self.assertIn("if(!MQLInfoInteger(MQL_TESTER))", text)
+        self.assertIn("计划风险含缓冲超过 30 美元", text)
+        self.assertIn("当日不利盈亏达到 100 美元", text)
+        self.assertIn("保护性停止不解除", text)
+        self.assertNotIn("XauDemoSafe_", text)
+        self.assertNotIn("XauTest30_", text)
+        self.assertNotIn("XD1:", text)
+        self.assertNotIn("XT30:", text)
+        self.assertNotIn("当日不利盈亏达到 10 美元", text)
+        self.assertNotIn("WebRequest", text)
+        self.assertNotIn("#include", text)
+        self.assertEqual(text.count("g_st.protHalt = 0"), 1)
+        code = strip_mql(text)
         self.assertEqual(code.count("{"), code.count("}"))
         self.assertEqual(code.count("("), code.count(")"))
 

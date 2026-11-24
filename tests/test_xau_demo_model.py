@@ -17,13 +17,17 @@ from xau_demo_model import (  # noqa: E402
     classify_startup,
     daily_loss_hit,
     environment_allowed,
+    apply_day_streak,
     is_gold_symbol,
     lot_allowed,
     make_comment,
     mark_sent,
     may_flatten,
+    replay_today_closes,
+    restart_same_day,
     risk_allows,
     risk_total,
+    roll_lot010_day,
     roll_server_day,
     spread_ok,
     state_filename,
@@ -354,6 +358,66 @@ class VariantGateTests(unittest.TestCase):
         self.assertEqual(decision, "refuse")
         self.assertFalse(may_flatten(item, {"10"}, 26011430, "XAUUSD", tag="XD1"))
         self.assertTrue(may_flatten(item, {"10"}, 26011430, "XAUUSD", tag="XT30"))
+
+
+class Lot010Tests(unittest.TestCase):
+    def test_point_one_lot_respects_step_and_minimum(self):
+        self.assertTrue(lot_allowed(0.10, 0.01, 50, 0.01, 0, 0, required=0.10))
+        self.assertTrue(lot_allowed(0.10, 0.10, 50, 0.10, 0, 0, required=0.10))
+        self.assertFalse(lot_allowed(0.01, 0.01, 50, 0.01, 0, 0, required=0.10))
+        self.assertFalse(lot_allowed(0.10, 0.20, 50, 0.01, 0, 0, required=0.10))
+        self.assertFalse(lot_allowed(0.10, 0.01, 50, 0.03, 0, 0, required=0.10))
+        self.assertFalse(environment_allowed("lot010", False, "demo", "hedge", "USD"))
+        self.assertFalse(environment_allowed("lot010", False, "real", "hedge", "USD"))
+        self.assertTrue(environment_allowed("lot010", True, "demo", "hedge", "USD"))
+        self.assertFalse(environment_allowed("lot010", True, "demo", "netting", "USD"))
+
+    def test_fixed_fee_is_not_multiplied_by_ten(self):
+        # Price P/L scales with lot. The configured commission is added once.
+        # 22.88 from an old 0.01 log must not be treated as an exact 228.80 at 0.10.
+        small = risk_total(1, 100.0, 97.0, 0.01, 0.01, 0, 1.0, stub_profit)
+        large = risk_total(1, 100.0, 97.0, 0.10, 0.01, 0, 1.0, stub_profit)
+        self.assertAlmostEqual(small, 4.0)
+        self.assertAlmostEqual(large, 31.0)
+        self.assertNotAlmostEqual(large, small * 10)
+        self.assertFalse(risk_allows(large, 30.0))
+        self.assertTrue(risk_allows(30.0, 30.0))
+        self.assertFalse(risk_allows(300.0, 30.0))
+
+    def test_three_same_day_losses_pause_and_do_not_survive_the_day(self):
+        streak, halt = apply_day_streak(0, 0, -1)
+        streak, halt = apply_day_streak(streak, halt, -1)
+        self.assertEqual((streak, halt), (2, 0))
+        streak, halt = apply_day_streak(streak, halt, 0)
+        self.assertEqual((streak, halt), (2, 0))
+        streak, halt = apply_day_streak(streak, halt, 2)
+        self.assertEqual((streak, halt), (0, 0))
+        streak, halt = replay_today_closes([-1, -1, -1])
+        self.assertEqual((streak, halt), (3, 1))
+        streak, halt = apply_day_streak(streak, halt, 5)
+        self.assertEqual((streak, halt), (3, 1))
+        # Yesterday's two losses are not in today's list.
+        self.assertEqual(replay_today_closes([]), (0, 0))
+        daily, streak_halt, prot, streak = roll_lot010_day(True, True, True, 3)
+        self.assertEqual((daily, streak_halt, prot, streak), (False, False, True, 0))
+        # Same-day restart keeps a saved pause even if today's history is missing.
+        streak, halt, daily_halt = restart_same_day(True, True, [])
+        self.assertEqual((streak, halt, daily_halt), (0, 1, True))
+        streak, halt, daily_halt = restart_same_day(False, False, [-5, -1, -0.2])
+        self.assertEqual((streak, halt, daily_halt), (3, 1, False))
+
+    def test_lot010_state_is_not_adopted_by_older_variants(self):
+        self.assertNotEqual(state_filename("lot010", "7"), state_filename("demo10", "7"))
+        self.assertNotEqual(state_filename("lot010", "7"), state_filename("tester30", "7"))
+        comment = make_comment(26011410, 1000, "L010")
+        self.assertLessEqual(len(comment), 31)
+        item = Item("8", 26011410, "XAUUSD", comment)
+        decision, _fresh = classify_startup([item], "8", "", 26011410, "XAUUSD", False, tag="L010")
+        self.assertEqual(decision, "adopt")
+        decision, _fresh = classify_startup([item], "8", "", 26011410, "XAUUSD", False, tag="XT30")
+        self.assertEqual(decision, "refuse")
+        decision, _fresh = classify_startup([item], "8", "", 26011410, "XAUUSD", False, tag="XD1")
+        self.assertEqual(decision, "refuse")
 
 
 if __name__ == "__main__":

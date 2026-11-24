@@ -35,7 +35,7 @@ def make_comment(magic: int, setup_bar: int, tag: str = "XD1") -> str:
         raise ValueError("magic out of range")
     if setup_bar < 0:
         raise ValueError("setup bar")
-    if tag not in ("XD1", "XT30"):
+    if tag not in ("XD1", "XT30", "L010"):
         raise ValueError("tag")
     text = f"{tag}:{magic}:{setup_bar}"
     if len(text) > COMMENT_MAX:
@@ -44,7 +44,7 @@ def make_comment(magic: int, setup_bar: int, tag: str = "XD1") -> str:
 
 
 def comment_prefix(magic: int, tag: str = "XD1") -> str:
-    if tag not in ("XD1", "XT30"):
+    if tag not in ("XD1", "XT30", "L010"):
         raise ValueError("tag")
     return f"{tag}:{magic}:"
 
@@ -164,7 +164,7 @@ def environment_allowed(variant, is_tester, trade_mode, margin_mode, currency) -
         return False
     if variant == "demo10":
         return True if is_tester else trade_mode == "demo"
-    if variant == "tester30":
+    if variant in ("tester30", "lot010"):
         return bool(is_tester)
     raise ValueError(variant)
 
@@ -174,11 +174,13 @@ def state_filename(variant, digest) -> str:
         return f"XauDemoSafe_{digest}.txt"
     if variant == "tester30":
         return f"XauTest30_{digest}.txt"
+    if variant == "lot010":
+        return f"XauLot010_{digest}.txt"
     raise ValueError(variant)
 
 
-def lot_allowed(lot, vmin, vmax, step, volume_limit, open_volume) -> bool:
-    if abs(lot - LOT) > 1e-12:
+def lot_allowed(lot, vmin, vmax, step, volume_limit, open_volume, required=LOT) -> bool:
+    if abs(lot - required) > 1e-12:
         return False
     if step <= 0 or vmin <= 0:
         return False
@@ -212,6 +214,36 @@ def daily_loss_hit(realized, floating, cap=DAILY_CAP) -> bool:
 def roll_server_day(daily_halt: bool, streak_halt: bool):
     """A new server day clears only the daily dollar halt."""
     return False, streak_halt
+
+
+def apply_day_streak(streak: int, streak_halt: int, net: float, cap: int = 3):
+    """Same-day streak. A win resets only before the halt locks. Zero does neither."""
+    if net < 0:
+        streak += 1
+        if streak >= cap:
+            streak_halt = 1
+    elif net > 0 and not streak_halt:
+        streak = 0
+    return streak, streak_halt
+
+
+def replay_today_closes(nets, cap: int = 3):
+    streak, halt = 0, 0
+    for net in nets:
+        streak, halt = apply_day_streak(streak, halt, net, cap)
+    return streak, halt
+
+
+def roll_lot010_day(daily_halt: bool, streak_halt: bool, prot_halt: bool, streak: int):
+    """A new server day clears money and same-day streak pauses, not a protection halt."""
+    return False, False, prot_halt, 0
+
+
+def restart_same_day(saved_streak_halt: bool, saved_daily_halt: bool, today_nets, cap: int = 3):
+    streak, halt = replay_today_closes(today_nets, cap)
+    if saved_streak_halt:
+        halt = 1
+    return streak, halt, saved_daily_halt
 
 
 def apply_close(streak: int, streak_halt: int, net: float):
