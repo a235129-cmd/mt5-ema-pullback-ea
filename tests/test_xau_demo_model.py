@@ -422,5 +422,40 @@ class Lot010Tests(unittest.TestCase):
         self.assertEqual(decision, "refuse")
 
 
+class R300D500Tests(unittest.TestCase):
+    def test_trade_cap_300_and_daily_trigger_500(self):
+        self.assertTrue(risk_allows(300.0, 300.0))
+        self.assertFalse(risk_allows(300.01, 300.0))
+        self.assertTrue(risk_allows(139.80, 300.0))
+        self.assertFalse(risk_allows(468.50, 300.0))
+        self.assertTrue(daily_loss_hit(-500.0, 0.0, cap=500.0))
+        self.assertFalse(daily_loss_hit(-499.99, 0.0, cap=500.0))
+        self.assertTrue(daily_loss_hit(-500.0, 20.0, cap=500.0))
+        self.assertFalse(daily_loss_hit(-400.0, 0.0, cap=500.0))
+        daily, streak_halt, prot, streak = roll_lot010_day(True, True, True, 3)
+        self.assertEqual((daily, streak_halt, prot, streak), (False, False, True, 0))
+        self.assertEqual(replay_today_closes([-1, -1]), (2, 0))
+        self.assertEqual(replay_today_closes([-1, -1, -1]), (3, 1))
+
+    def test_r300_state_is_separate_and_charts_are_refused(self):
+        self.assertFalse(environment_allowed("r300d500", False, "demo", "hedge", "USD"))
+        self.assertFalse(environment_allowed("r300d500", False, "real", "hedge", "USD"))
+        self.assertTrue(environment_allowed("r300d500", True, "demo", "hedge", "USD"))
+        self.assertFalse(environment_allowed("r300d500", True, "demo", "netting", "USD"))
+        name = state_filename("r300d500", "9")
+        self.assertTrue(name.startswith("XauR300D500_"))
+        self.assertNotEqual(name, state_filename("r50lot010", "9"))
+        self.assertNotEqual(name, state_filename("tester30", "9"))
+        self.assertNotEqual(name, state_filename("demo10", "9"))
+        comment = make_comment(26011500, 1000, "R300")
+        self.assertLessEqual(len(comment), 31)
+        item = Item("9", 26011500, "XAUUSD", comment)
+        decision, _fresh = classify_startup([item], "9", "", 26011500, "XAUUSD", False, tag="R300")
+        self.assertEqual(decision, "adopt")
+        for tag in ("R050", "XT30", "XD1"):
+            decision, _fresh = classify_startup([item], "9", "", 26011500, "XAUUSD", False, tag=tag)
+            self.assertEqual(decision, "refuse")
+
+
 if __name__ == "__main__":
     unittest.main()

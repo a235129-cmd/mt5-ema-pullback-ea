@@ -35,7 +35,7 @@ def make_comment(magic: int, setup_bar: int, tag: str = "XD1") -> str:
         raise ValueError("magic out of range")
     if setup_bar < 0:
         raise ValueError("setup bar")
-    if tag not in ("XD1", "XT30", "R050"):
+    if tag not in ("XD1", "XT30", "R050", "R300"):
         raise ValueError("tag")
     text = f"{tag}:{magic}:{setup_bar}"
     if len(text) > COMMENT_MAX:
@@ -44,7 +44,7 @@ def make_comment(magic: int, setup_bar: int, tag: str = "XD1") -> str:
 
 
 def comment_prefix(magic: int, tag: str = "XD1") -> str:
-    if tag not in ("XD1", "XT30", "R050"):
+    if tag not in ("XD1", "XT30", "R050", "R300"):
         raise ValueError("tag")
     return f"{tag}:{magic}:"
 
@@ -164,7 +164,7 @@ def environment_allowed(variant, is_tester, trade_mode, margin_mode, currency) -
         return False
     if variant == "demo10":
         return True if is_tester else trade_mode == "demo"
-    if variant in ("tester30", "r50lot010"):
+    if variant in ("tester30", "r50lot010", "r300d500"):
         return bool(is_tester)
     raise ValueError(variant)
 
@@ -176,6 +176,8 @@ def state_filename(variant, digest) -> str:
         return f"XauTest30_{digest}.txt"
     if variant == "r50lot010":
         return f"XauR50Lot010_{digest}.txt"
+    if variant == "r300d500":
+        return f"XauR300D500_{digest}.txt"
     raise ValueError(variant)
 
 
